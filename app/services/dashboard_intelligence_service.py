@@ -9,7 +9,7 @@ DASHBOARD_TAXONOMY: Dict[str, Dict[str, Any]] = {
     "LAND_FEASIBILITY": {
         "business_intent": "Maximize risk-adjusted return on development options while ensuring zoning, hurdle rate, and capital feasibility",
         "decision_type": "Capital Allocation & Feasibility Hurdle Evaluation",
-        "relevant_data_domain": "Real Estate Feasibility, HBU Valuation, and Development Cost Accounting",
+        "relevant_data_domain": "Real Estate Feasibility, Highest and Best Use (HBU) Valuation, and Development Cost Accounting",
         "supported_scenario_types": [
             "Capital Reduction",
             "Commercial Unviability",

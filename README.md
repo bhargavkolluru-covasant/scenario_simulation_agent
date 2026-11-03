@@ -21,7 +21,7 @@ The platform uses semantic reasoning and LLM-powered decision support instead of
 
 - Finance, Cost & Cash Flow
 - Market & Competitive Intelligence
-- Land Feasibility & Highest Best Use (HBU)
+- Land Feasibility & Highest and Best Use (HBU)
 - Project Delivery & Construction
 - Portfolio Operations
 - Sales & Customer Lifecycle

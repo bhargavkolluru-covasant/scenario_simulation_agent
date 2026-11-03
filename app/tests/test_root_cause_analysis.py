@@ -162,7 +162,7 @@ async def test_impact_report_and_explainability_use_root_causes_without_graph():
     assert "Service-quality or issue-resolution shortfall" in llm.prompt
     assert "## Root Cause Analysis" in report["markdown_report"]
     assert "## Causal Impact Analysis" in report["markdown_report"]
-    assert "Selected KPI impact path:" in report["markdown_report"]
+    assert "Business impact path:" in report["markdown_report"]
     assert "## Financial Impact" not in report["markdown_report"]
     assert report["financial_impact"] is None
     assert "Confidence:" in report["markdown_report"]

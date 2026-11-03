@@ -691,10 +691,11 @@ async def test_report_uses_explanation_and_hides_telemetry_scores():
 
     markdown = report["markdown_report"]
     assert "delivery" not in report["executive_summary"].casefold()
-    assert "**Situation:**" in markdown
-    assert "**Business Impact:**" in markdown
     assert "**Decision Required:**" in markdown
-    assert "**Expected Outcome:**" in markdown
+    assert markdown.count("**Decision Required:**") == 1
+    assert "**Situation:**" not in markdown
+    assert "**Business Impact:**" not in markdown
+    assert "**Expected Outcome:**" not in markdown
     assert len(report["executive_summary"].split()) <= 120
     assert "Dashboard Records Evaluated: 12" not in markdown
     assert "42/100" not in markdown
@@ -796,7 +797,7 @@ async def test_report_uses_full_query_and_renders_currency_and_percent_once():
     assert report["title"] == "Executive Scenario Report"
     assert query in markdown
     assert "51.81%" in markdown
-    assert markdown.count("Variance is elevated.") == 2
+    assert markdown.casefold().count("variance is elevated.") == 2
     assert report["primary_kpi"]["why_it_matters"] == "Variance is elevated."
     assert "Accrued Unpaid Commissions" not in markdown
     assert report["financial_impact"] is None

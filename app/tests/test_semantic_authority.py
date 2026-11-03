@@ -91,7 +91,8 @@ async def test_report_renders_only_authoritative_decision_state():
     assert "Legacy action" not in report["markdown_report"]
     assert "Operational Risk" not in report["markdown_report"]
     assert "Market Dashboard" in report["markdown_report"]
-    assert "Upcoming Supply" in report["markdown_report"]
+    assert "Upcoming Supply" not in report["markdown_report"]
+    assert report["dashboard_context"] == {"title": "Market Dashboard"}
     assert "Inactive Broker Bookings" not in report["markdown_report"]
     assert "AED 50M" not in report["markdown_report"]
     assert "## Financial Impact" not in report["markdown_report"]
@@ -134,10 +135,7 @@ async def test_report_is_an_executive_brief_and_prints_query_once_with_kpi_value
 
     markdown = report["markdown_report"]
     assert markdown.count(query) == 1
-    assert "**Situation:**" in markdown
-    assert "**Business Impact:**" in markdown
     assert "**Decision Required:**" in markdown
-    assert "**Expected Outcome:**" in markdown
     assert markdown.count("Value not available from dashboard metadata") == 2
     assert "Finance Dashboard" in markdown
     assert "AP Aging Buckets" in markdown
@@ -145,6 +143,170 @@ async def test_report_is_an_executive_brief_and_prints_query_once_with_kpi_value
     assert len(report["executive_conclusion"].split(". ")) <= 3
     assert query not in report["executive_decision_required"]["situation"]
     assert query not in report["executive_conclusion"]
+
+
+@pytest.mark.asyncio
+async def test_report_formats_hbu_values_and_keeps_decision_once():
+    primary_kpi = {"name": "Top-Ranked HBU Options"}
+    action_text = (
+        "Allocate capital only to the highest-ranked HBU options and defer "
+        "lower-ranked developments."
+    )
+    report = await ReportService().generate_report({
+        "query": "Which options should receive investment capital?",
+        "scenario": {"description": "Investment capital is reduced by 30%."},
+        "dashboard_context": {"title": "Highest Benefit Unit Dashboard"},
+        "dashboard_widget_kpis": [
+            {"name": "Unrelated Dashboard KPI", "value": 99},
+        ],
+        "dashboard_rows": [
+            {
+                "option_id": "OPT-0003",
+                "weighted_score": 11.29,
+            },
+            {
+                "option_id": "OPT-0021",
+                "weighted_score": 10.4,
+            },
+        ],
+        "primary_kpi": primary_kpi,
+        "supporting_kpis": [{"name": "AP Aging Buckets"}],
+        "primary_risk": {
+            "name": "Capital Allocation Risk",
+            "business_impact": "Viable high-return projects may be delayed.",
+        },
+        "selected_actions": [{
+            "title": "Highest Benefit Unit: prioritize investments",
+            "action": action_text,
+            "expected_outcome": "Preserve capital for the strongest opportunities.",
+        }],
+    })
+
+    markdown = report["markdown_report"]
+    decision_section = markdown.split("## Executive Decision Required\n", 1)[1]
+    decision_section = decision_section.split("\n## ", 1)[0]
+    assert decision_section.count(action_text) == 1
+    assert "Leading Option: OPT-0003" in markdown
+    assert "Weighted Score: 11.29" in markdown
+    assert "Rank: #1" in markdown
+    assert "Why it matters:" in markdown
+    assert "aging profile highlights overdue supplier obligations" in markdown
+    assert "Highest Benefit Unit" not in markdown
+    assert "Highest and Best Use (HBU)" in markdown
+    assert "Unrelated Dashboard KPI" not in markdown
+    assert "Dashboard KPIs:" not in markdown
+    assert markdown.count("Which options should receive investment capital?") == 1
+    assert len(report["executive_summary"].split()) <= 100
+    assert len(report["executive_conclusion"].split(". ")) <= 3
+    assert report["primary_kpi"] is primary_kpi
+
+
+@pytest.mark.asyncio
+async def test_report_uses_dashboard_finance_and_market_values():
+    report = await ReportService().generate_report({
+        "dashboard_category": "FINANCE",
+        "dashboard_rows": [
+            {
+                "metric_name": "Cashflow Actual vs Forecast",
+                "actual_value": "AED 8M",
+                "forecast_value": "AED 10M",
+            },
+            {
+                "statistic_name": "Competitor Launches by Detection Source",
+                "statistic_value": 7,
+            },
+        ],
+        "primary_kpi": {"name": "Cashflow Actual vs Forecast"},
+        "supporting_kpis": [{
+            "name": "Competitor Launches by Detection Source",
+        }],
+    })
+
+    markdown = report["markdown_report"]
+    assert "Latest Actual: AED 8M" in markdown
+    assert "Latest Forecast: AED 10M" in markdown
+    assert "Current Launch Count: 7" in markdown
+
+
+@pytest.mark.asyncio
+async def test_report_resolves_project_and_aging_data_from_nested_widgets():
+    report = await ReportService().generate_report({
+        "query": "What is the impact of a 90-day delay?",
+        "scenario": {
+            "description": "A 90-day delay to Horizon Heights would postpone handover.",
+            "target_entity": "Horizon Heights",
+        },
+        "dashboard_data": {
+            "widgets": [{
+                "title": "Project Milestones",
+                "data": {
+                    "rows": [{
+                        "project_name": "Horizon Heights",
+                        "location": "Dubai",
+                        "planned_handover_date": "2026-12-01",
+                        "construction_status": "Under Construction",
+                    }],
+                },
+            }],
+            "stat_cards": [{
+                "title": "Projects Nearing Handover",
+                "value": 4,
+            }],
+            "table_records": [{
+                "bucket": "90+",
+                "count": 11,
+            }],
+        },
+        "primary_kpi": {"name": "Projects Nearing Handover"},
+        "supporting_kpis": [{"name": "AP Aging Buckets"}],
+        "primary_risk": {
+            "name": "Revenue Recognition Delay",
+            "business_impact": "Deferred handover can postpone revenue recognition.",
+        },
+        "selected_actions": [{
+            "title": "Approve schedule recovery",
+            "action": "Prioritize critical-path recovery and customer communication.",
+            "expected_outcome": "Reduce handover slippage and protect customer commitments.",
+        }],
+    })
+
+    markdown = report["markdown_report"]
+    assert "Project: Horizon Heights" in markdown
+    assert "Location: Dubai" in markdown
+    assert "Target Handover: 2026-12-01" in markdown
+    assert "Status: Under Construction" in markdown
+    assert "4" in markdown
+    assert "90+ day bucket contains 11" in markdown
+    assert "A 90-day delay to Horizon Heights" in report["executive_summary"]
+    assert "most important indicator" in report["executive_summary"]
+    assert "greatest business risk" in report["executive_summary"]
+    assert "Leadership should prioritize" in report["executive_summary"]
+    assert 80 <= len(report["executive_summary"].split()) <= 120
+    assert len(report["executive_conclusion"].split(". ")) == 3
+    assert "selected KPI" not in markdown.casefold()
+    assert "decision signal" not in markdown.casefold()
+
+
+@pytest.mark.asyncio
+async def test_report_uses_latest_chart_series_values():
+    report = await ReportService().generate_report({
+        "widget_data": {
+            "chart_series": [
+                {"name": "Actual", "values": [5, 8]},
+                {"name": "Forecast", "values": [9, 10]},
+                {"name": "Variance", "values": [1, 2]},
+                {"name": "Competitor Launches", "values": [3, 7]},
+            ],
+        },
+        "primary_kpi": {"name": "Cashflow Actual vs Forecast"},
+        "supporting_kpis": [{"name": "Competitor Launches"}],
+    })
+
+    markdown = report["markdown_report"]
+    assert "Latest Actual: 8" in markdown
+    assert "Latest Forecast: 10" in markdown
+    assert "Variance: 2" in markdown
+    assert "Current Launch Count: 7" in markdown
 
 
 @pytest.mark.asyncio
